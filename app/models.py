@@ -18,3 +18,12 @@ class Link(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     expires_at = Column(DateTime, nullable=True)
     click_count = Column(Integer, default=0)
+
+class Click(Base):
+    __tablename__ = "clicks"
+    id = Column(Integer, primary_key=True)
+    link_id = Column(Integer, ForeignKey("links.id"), nullable=False, index=True)
+    clicked_at = Column(DateTime, default=datetime.utcnow, index=True)
+    browser = Column(String)
+    device = Column(String)
+    referrer = Column(String, nullable=True)

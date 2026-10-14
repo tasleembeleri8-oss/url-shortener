@@ -23,3 +23,11 @@ class LinkInfo(BaseModel):
     click_count: int
     created_at: datetime
     model_config = {"from_attributes": True}
+
+class LinkStats(BaseModel):
+    short_code: str
+    original_url: str
+    total_clicks: int
+    daily_clicks: dict[str, int]
+    browsers: dict[str, int]
+    devices: dict[str, int]
