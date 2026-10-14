@@ -22,3 +22,9 @@ def incr_clicks(code: str):
         redis_client.incr(f"clicks:{code}")
     except redis.RedisError as e:
         print("Redis error:", e)
+
+def delete_cached(code: str):
+    try:
+        redis_client.delete(f"url:{code}", f"clicks:{code}")
+    except redis.RedisError as e:
+        print("Redis error:", e)

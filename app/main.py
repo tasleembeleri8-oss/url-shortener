@@ -1,13 +1,15 @@
 from datetime import datetime
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.responses import RedirectResponse
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
 from . import models, schemas
+from .auth import hash_password, verify_password, create_access_token, get_current_user
 from .database import engine, get_db
 from .config import settings
 from .utils import encode_base62
-from .cache import get_cached_url, cache_url, incr_clicks, CACHE_TTL
+from .cache import get_cached_url, cache_url, incr_clicks, delete_cached, CACHE_TTL
 
 models.Base.metadata.create_all(bind=engine)
 app = FastAPI(title="URL Shortener")
@@ -18,9 +20,31 @@ def root():
     return {"message": "URL Shortener API", "docs": "/docs"}
 
 
+@app.post("/auth/signup", response_model=schemas.Token, status_code=201)
+def signup(payload: schemas.UserCreate, db: Session = Depends(get_db)):
+    if db.query(models.User).filter_by(username=payload.username).first():
+        raise HTTPException(status_code=400, detail="Username already taken")
+    user = models.User(username=payload.username, password_hash=hash_password(payload.password))
+    db.add(user)
+    db.commit()
+    return schemas.Token(access_token=create_access_token(user.id))
+
+
+@app.post("/auth/login", response_model=schemas.Token)
+def login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    user = db.query(models.User).filter_by(username=form.username).first()
+    if not user or not verify_password(form.password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Incorrect username or password")
+    return schemas.Token(access_token=create_access_token(user.id))
+
+
 @app.post("/shorten", response_model=schemas.LinkOut)
-def shorten(payload: schemas.LinkCreate, db: Session = Depends(get_db)):
-    link = models.Link(original_url=str(payload.url))
+def shorten(
+    payload: schemas.LinkCreate,
+    db: Session = Depends(get_db),
+    user: models.User = Depends(get_current_user),
+):
+    link = models.Link(original_url=str(payload.url), user_id=user.id)
     db.add(link)
     db.flush()
     link.short_code = encode_base62(link.id + 100000)
@@ -30,6 +54,30 @@ def shorten(payload: schemas.LinkCreate, db: Session = Depends(get_db)):
         short_url=f"{settings.base_url}/{link.short_code}",
         original_url=link.original_url,
     )
+
+
+@app.get("/links", response_model=list[schemas.LinkInfo])
+def my_links(db: Session = Depends(get_db), user: models.User = Depends(get_current_user)):
+    return (
+        db.query(models.Link)
+        .filter_by(user_id=user.id)
+        .order_by(models.Link.created_at.desc())
+        .all()
+    )
+
+
+@app.delete("/links/{short_code}", status_code=204)
+def delete_link(
+    short_code: str,
+    db: Session = Depends(get_db),
+    user: models.User = Depends(get_current_user),
+):
+    link = db.query(models.Link).filter_by(short_code=short_code, user_id=user.id).first()
+    if not link:
+        raise HTTPException(status_code=404, detail="Link not found")
+    db.delete(link)
+    db.commit()
+    delete_cached(short_code)
 
 
 @app.get("/{short_code}")
