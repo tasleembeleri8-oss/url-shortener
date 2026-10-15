@@ -19,7 +19,7 @@ def get_cached_link(code: str):
 
 def cache_link(code: str, link_id: int, url: str, ttl: int = CACHE_TTL):
     try:
-        redis_client.setex(f"link:{code}", ttl, f"{link_id}|{url}")
+        redis_client.set(f"link:{code}", f"{link_id}|{url}", ex=ttl)
     except redis.RedisError as e:
         print("Redis error:", e)
 

@@ -1,13 +1,27 @@
 services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+psycopg://shortener:shortener@db:5432/shortener
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY: ${SECRET_KEY:-dev-only-change-me}
+      BASE_URL: http://localhost:8000
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
   db:
     image: postgres:16
     environment:
       POSTGRES_USER: shortener
       POSTGRES_PASSWORD: shortener
       POSTGRES_DB: shortener
-    ports:
-      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U shortener"]
+      interval: 5s
+      retries: 10
   redis:
     image: redis:7
-    ports:
-      - "6379:6379"
