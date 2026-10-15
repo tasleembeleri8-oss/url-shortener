@@ -6,8 +6,10 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 from .ratelimit import limit_by_ip, limit_by_user
 
+
 from . import models, schemas
-from .analytics import record_click
+from contextlib import asynccontextmanager
+from .analytics import record_click, start_flusher, stop_flusher
 from .auth import hash_password, verify_password, create_access_token, get_current_user
 from .database import engine, get_db
 from .config import settings
@@ -15,7 +17,14 @@ from .utils import encode_base62
 from .cache import get_cached_link, cache_link, delete_cached, CACHE_TTL
 
 models.Base.metadata.create_all(bind=engine)
-app = FastAPI(title="URL Shortener")
+@asynccontextmanager
+async def lifespan(app):
+    start_flusher()
+    yield
+    stop_flusher()
+
+
+app = FastAPI(title="URL Shortener", lifespan=lifespan)
 
 
 @app.get("/")

@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 
-from app import cache, models
+from app import analytics, cache, models
 from app.database import SessionLocal
 from app.utils import encode_base62, parse_user_agent
 
@@ -115,12 +115,12 @@ def test_stats_count_clicks_by_browser_and_device(client):
     code = make_link(client, headers)
     client.get(f"/{code}", headers={"user-agent": CHROME_UA}, follow_redirects=False)
     client.get(f"/{code}", headers={"user-agent": IPHONE_UA}, follow_redirects=False)
+    assert analytics.flush_clicks() == 2
 
     stats = client.get(f"/stats/{code}", headers=headers).json()
     assert stats["total_clicks"] == 2
     assert stats["browsers"] == {"Chrome": 1, "Safari": 1}
     assert stats["devices"] == {"desktop": 1, "mobile": 1}
-
 
 def test_expired_link_returns_410(client):
     headers = signup(client)
