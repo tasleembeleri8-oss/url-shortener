@@ -4,6 +4,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import func
 from sqlalchemy.orm import Session
+from .ratelimit import limit_by_ip, limit_by_user
 
 from . import models, schemas
 from .analytics import record_click
@@ -22,7 +23,8 @@ def root():
     return {"message": "URL Shortener API", "docs": "/docs"}
 
 
-@app.post("/auth/signup", response_model=schemas.Token, status_code=201)
+@app.post("/auth/signup", response_model=schemas.Token, status_code=201,
+          dependencies=[Depends(limit_by_ip("signup", 5, 3600))])
 def signup(payload: schemas.UserCreate, db: Session = Depends(get_db)):
     if db.query(models.User).filter_by(username=payload.username).first():
         raise HTTPException(status_code=400, detail="Username already taken")
@@ -32,7 +34,8 @@ def signup(payload: schemas.UserCreate, db: Session = Depends(get_db)):
     return schemas.Token(access_token=create_access_token(user.id))
 
 
-@app.post("/auth/login", response_model=schemas.Token)
+@app.post("/auth/login", response_model=schemas.Token,
+          dependencies=[Depends(limit_by_ip("login", 10, 60))])
 def login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     user = db.query(models.User).filter_by(username=form.username).first()
     if not user or not verify_password(form.password, user.password_hash):
@@ -40,7 +43,8 @@ def login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get
     return schemas.Token(access_token=create_access_token(user.id))
 
 
-@app.post("/shorten", response_model=schemas.LinkOut)
+@app.post("/shorten", response_model=schemas.LinkOut,
+          dependencies=[Depends(limit_by_user("shorten", 10, 60))])
 def shorten(
     payload: schemas.LinkCreate,
     db: Session = Depends(get_db),
@@ -125,7 +129,7 @@ def delete_link(
     delete_cached(short_code)
 
 
-@app.get("/{short_code}")
+@app.get("/{short_code}", dependencies=[Depends(limit_by_ip("redirect", 120, 60))])
 def redirect(
     short_code: str,
     request: Request,
