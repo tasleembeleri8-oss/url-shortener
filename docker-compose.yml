@@ -8,6 +8,8 @@ services:
       REDIS_URL: redis://redis:6379/0
       SECRET_KEY: ${SECRET_KEY:-dev-only-change-me}
       BASE_URL: http://localhost:8000
+      RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-true}
+      CACHE_ENABLED: ${CACHE_ENABLED:-true}
     depends_on:
       db:
         condition: service_healthy
