@@ -64,12 +64,27 @@ def shorten(
 
 @app.get("/links", response_model=list[schemas.LinkInfo])
 def my_links(db: Session = Depends(get_db), user: models.User = Depends(get_current_user)):
-    return (
+    links = (
         db.query(models.Link)
         .filter_by(user_id=user.id)
         .order_by(models.Link.created_at.desc())
         .all()
     )
+    counts = dict(
+        db.query(models.Click.link_id, func.count(models.Click.id))
+        .filter(models.Click.link_id.in_([l.id for l in links]))
+        .group_by(models.Click.link_id)
+        .all()
+    )
+    return [
+        schemas.LinkInfo(
+            short_code=l.short_code,
+            original_url=l.original_url,
+            click_count=counts.get(l.id, 0),
+            created_at=l.created_at,
+        )
+        for l in links
+    ]
 
 
 @app.get("/stats/{short_code}", response_model=schemas.LinkStats)
@@ -104,10 +119,17 @@ def link_stats(
         .group_by(models.Click.device)
         .all()
     )
+
+    total = (
+        db.query(func.count(models.Click.id))
+        .filter(models.Click.link_id == link.id)
+        .scalar()
+    )
+
     return schemas.LinkStats(
         short_code=link.short_code,
         original_url=link.original_url,
-        total_clicks=link.click_count,
+        total_clicks=total,
         daily_clicks={str(d): c for d, c in daily},
         browsers={b or "Other": c for b, c in browsers},
         devices={d or "desktop": c for d, c in devices},

@@ -10,5 +10,6 @@ class Settings(BaseSettings):
     algorithm: str = "HS256"
     access_token_minutes: int = 60
     rate_limit_enabled: bool = True
+    cache_enabled: bool = True
 
 settings = Settings()
