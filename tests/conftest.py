@@ -4,6 +4,8 @@ os.environ["DATABASE_URL"] = "sqlite:///./test.db"
 os.environ["REDIS_URL"] = "redis://localhost:6379/0"
 os.environ["SECRET_KEY"] = "test-secret-key-for-automated-tests-only-0123456789"
 os.environ["BASE_URL"] = "http://testserver"
+os.environ["RATE_LIMIT_ENABLED"] = "true"
+os.environ["CACHE_ENABLED"] = "true"
 
 import fakeredis
 import pytest
