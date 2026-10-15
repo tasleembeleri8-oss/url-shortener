@@ -11,5 +11,6 @@ class Settings(BaseSettings):
     access_token_minutes: int = 60
     rate_limit_enabled: bool = True
     cache_enabled: bool = True
+    cors_origins: str = "http://localhost:5173"
 
 settings = Settings()

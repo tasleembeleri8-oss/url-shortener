@@ -1,6 +1,30 @@
+# Python
 venv/
+.venv/
 __pycache__/
+*.py[cod]
+
+# Environment variables and secrets
 .env
-*.db
+.env.*
+!.env.example
+
+# Node.js
+node_modules/
+**/node_modules/
+
+# Frontend build output
+dist/
+**/dist/
+
+# Editor and operating system files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Test artifacts
 .coverage
+test.db
+*.db
 .pytest_cache/
