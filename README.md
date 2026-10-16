@@ -3,6 +3,20 @@
 
 A full-stack URL shortener built with **FastAPI, React, PostgreSQL, and Redis**. Shortly lets users create and manage short links, track click activity, and explore link performance through an analytics dashboard.
 
+
+# Shortly — URL Shortener & Analytics
+
+A full-stack URL shortener built with **FastAPI, React, PostgreSQL, and Redis**. Shortly lets users create and manage short links, track click activity, and explore link performance through an analytics dashboard.
+
+![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)
+![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)
+![Redis](https://img.shields.io/badge/Redis-DC382D?style=for-the-badge&logo=redis&logoColor=white)
+
+## Screenshots
+
+
 ## Screenshots
 
 ### Login
