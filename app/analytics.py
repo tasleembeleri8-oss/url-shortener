@@ -27,15 +27,25 @@ def _insert_clicks(rows: list[dict]):
         db.close()
 
 
-def record_click(link_id: int, user_agent: str | None, referrer: str | None):
-    browser, device = parse_user_agent(user_agent)
+
+def record_click(
+    link_id: int,
+    user_agent: str | None,
+    referrer: str | None,
+    visitor_id: str | None = None,
+):
+    browser, device, operating_system = parse_user_agent(user_agent)
+
     event = {
         "link_id": link_id,
         "browser": browser,
         "device": device,
+        "operating_system": operating_system,
+        "visitor_id": visitor_id,
         "referrer": referrer,
         "clicked_at": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
     }
+
     try:
         cache.redis_client.rpush(QUEUE_KEY, json.dumps(event))
     except redis.RedisError as e:
@@ -44,6 +54,7 @@ def record_click(link_id: int, user_agent: str | None, referrer: str | None):
             _insert_clicks([_to_row(event)])
         except Exception as e2:
             print("Click insert error:", e2)
+
 
 
 def flush_clicks() -> int:

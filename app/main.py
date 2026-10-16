@@ -1,4 +1,5 @@
 
+import secrets
 from datetime import datetime, timedelta
 from contextlib import asynccontextmanager
 
@@ -336,6 +337,15 @@ def redirect(
     user_agent = request.headers.get("user-agent")
     referrer = request.headers.get("referer")
 
+    # Get an existing visitor ID or generate a new one.
+    visitor_id = request.cookies.get("visitor_id")
+
+    if not visitor_id or len(visitor_id) > 64:
+        visitor_id = secrets.token_urlsafe(32)
+
+    # Use a secure cookie when the configured public URL uses HTTPS.
+    secure_cookie = settings.base_url.startswith("https://")
+
     # First, try the Redis cache.
     cached = get_cached_link(short_code)
 
@@ -382,12 +392,25 @@ def redirect(
             link.id,
             user_agent,
             referrer,
+            visitor_id,
         )
 
-        return RedirectResponse(
+        response = RedirectResponse(
             url,
             status_code=307,
         )
+
+        response.set_cookie(
+            key="visitor_id",
+            value=visitor_id,
+            max_age=60 * 60 * 24 * 365,
+            httponly=True,
+            secure=secure_cookie,
+            samesite="lax",
+            path="/",
+        )
+
+        return response
 
     # Cache miss: retrieve the link from the database.
     link = (
@@ -432,9 +455,22 @@ def redirect(
         link.id,
         user_agent,
         referrer,
+        visitor_id,
     )
 
-    return RedirectResponse(
+    response = RedirectResponse(
         link.original_url,
         status_code=307,
     )
+
+    response.set_cookie(
+        key="visitor_id",
+        value=visitor_id,
+        max_age=60 * 60 * 24 * 365,
+        httponly=True,
+        secure=secure_cookie,
+        samesite="lax",
+        path="/",
+    )
+
+    return response

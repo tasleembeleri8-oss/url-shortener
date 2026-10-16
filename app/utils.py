@@ -9,27 +9,48 @@ def encode_base62(num: int) -> str:
         result.append(ALPHABET[rem])
     return "".join(reversed(result))
 
+
 def parse_user_agent(ua: str | None):
     ua = (ua or "").lower()
+
+    # Browser detection
     if "edg/" in ua:
         browser = "Edge"
     elif "opr/" in ua or "opera" in ua:
         browser = "Opera"
-    elif "chrome" in ua:
-        browser = "Chrome"
-    elif "firefox" in ua:
+    elif "firefox/" in ua or "fxios" in ua:
         browser = "Firefox"
-    elif "safari" in ua:
+    elif "chrome/" in ua or "crios" in ua:
+        browser = "Chrome"
+    elif "safari/" in ua:
         browser = "Safari"
     else:
         browser = "Other"
 
-    if "bot" in ua or "curl" in ua or "spider" in ua:
+    # Device detection
+    if any(term in ua for term in ("bot", "crawler", "spider", "curl/")):
         device = "bot"
     elif "ipad" in ua or "tablet" in ua:
         device = "tablet"
-    elif "mobile" in ua or "android" in ua or "iphone" in ua:
+    elif any(term in ua for term in ("mobile", "android", "iphone", "ipod")):
         device = "mobile"
     else:
         device = "desktop"
-    return browser, device
+
+    # Operating system detection
+    if "windows" in ua:
+        operating_system = "Windows"
+    elif "iphone" in ua or "ipad" in ua or "ipod" in ua:
+        operating_system = "iOS"
+    elif "android" in ua:
+        operating_system = "Android"
+    elif "mac os" in ua or "macintosh" in ua:
+        operating_system = "macOS"
+    elif "linux" in ua:
+        operating_system = "Linux"
+    elif "cros" in ua:
+        operating_system = "ChromeOS"
+    else:
+        operating_system = "Other"
+
+    return browser, device, operating_system

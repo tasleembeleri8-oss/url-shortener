@@ -1,8 +1,252 @@
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { NavLink } from "react-router-dom";
 import { api } from "../api";
 import Sidebar from "../components/Sidebar";
+
+const COLORS = [
+  "#7c3aed",
+  "#06b6d4",
+  "#f59e0b",
+  "#10b981",
+  "#f97316",
+  "#6366f1",
+];
+
+function formatDate(date) {
+  const value = new Date(`${date}T00:00:00`);
+  return Number.isNaN(value.getTime())
+    ? date
+    : value.toLocaleDateString("en-IN", {
+        day: "2-digit",
+        month: "short",
+      });
+}
+
+function ChartCard({ title, subtitle, children }) {
+  return (
+    <section className="min-w-0 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm sm:p-6">
+      <div className="mb-5">
+        <h3 className="text-base font-bold text-slate-900">{title}</h3>
+        {subtitle && (
+          <p className="mt-1 text-xs text-slate-500">{subtitle}</p>
+        )}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function DailyLineChart({ data }) {
+  const width = 720;
+  const height = 240;
+  const left = 36;
+  const right = 16;
+  const top = 20;
+  const bottom = 42;
+  const chartWidth = width - left - right;
+  const chartHeight = height - top - bottom;
+
+  const values = data.map(([, count]) => Number(count) || 0);
+  const max = Math.max(1, ...values);
+  const points = data.map(([date], index) => {
+    const x =
+      data.length === 1
+        ? left + chartWidth / 2
+        : left + (index / (data.length - 1)) * chartWidth;
+
+    const y = top + chartHeight - (values[index] / max) * chartHeight;
+
+    return { x, y, date, value: values[index] };
+  });
+
+  const line = points
+    .map((point, index) =>
+      `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`
+    )
+    .join(" ");
+
+  const area = points.length
+    ? `${line} L ${points[points.length - 1].x} ${top + chartHeight} L ${points[0].x} ${top + chartHeight} Z`
+    : "";
+
+  const labelIndexes = [
+    ...new Set([
+      0,
+      Math.floor((data.length - 1) / 3),
+      Math.floor(((data.length - 1) * 2) / 3),
+      data.length - 1,
+    ]),
+  ].filter((index) => index >= 0);
+
+  return (
+    <div className="w-full">
+      {data.length === 0 ? (
+        <div className="flex h-60 items-center justify-center text-sm text-slate-500">
+          No click activity available for this period.
+        </div>
+      ) : (
+        <>
+          <div className="mb-3 flex items-center gap-2 text-xs text-slate-500">
+            <span className="h-2.5 w-2.5 rounded-full bg-violet-600" />
+            Daily clicks
+          </div>
+
+          <svg
+            viewBox={`0 0 ${width} ${height}`}
+            className="block w-full overflow-visible"
+            role="img"
+            aria-label="Daily clicks line chart"
+          >
+            {[0, 0.25, 0.5, 0.75, 1].map((fraction) => {
+              const y = top + chartHeight * fraction;
+              const label = Math.round(max * (1 - fraction));
+
+              return (
+                <g key={fraction}>
+                  <line
+                    x1={left}
+                    y1={y}
+                    x2={width - right}
+                    y2={y}
+                    stroke="#e2e8f0"
+                    strokeDasharray="4 4"
+                  />
+                  <text
+                    x={left - 8}
+                    y={y + 4}
+                    textAnchor="end"
+                    fontSize="10"
+                    fill="#94a3b8"
+                  >
+                    {label}
+                  </text>
+                </g>
+              );
+            })}
+
+            <path d={area} fill="#8b5cf6" fillOpacity="0.10" />
+
+            <path
+              d={line}
+              fill="none"
+              stroke="#7c3aed"
+              strokeWidth="3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+
+            {points.map((point) => (
+              <g key={point.date}>
+                <circle
+                  cx={point.x}
+                  cy={point.y}
+                  r="4"
+                  fill="#ffffff"
+                  stroke="#7c3aed"
+                  strokeWidth="2"
+                >
+                  <title>
+                    {point.date}: {point.value} clicks
+                  </title>
+                </circle>
+              </g>
+            ))}
+
+            {labelIndexes.map((index) => (
+              <text
+                key={index}
+                x={points[index].x}
+                y={height - 12}
+                textAnchor={
+                  index === 0
+                    ? "start"
+                    : index === data.length - 1
+                      ? "end"
+                      : "middle"
+                }
+                fontSize="10"
+                fill="#64748b"
+              >
+                {formatDate(points[index].date)}
+              </text>
+            ))}
+          </svg>
+        </>
+      )}
+    </div>
+  );
+}
+
+function BreakdownChart({ title, data }) {
+  const entries = Object.entries(data || {})
+    .map(([name, count]) => [name, Number(count) || 0])
+    .sort((a, b) => b[1] - a[1]);
+
+  const total = entries.reduce((sum, [, count]) => sum + count, 0);
+
+  let accumulated = 0;
+  const gradient = entries.map(([, count], index) => {
+    const start = accumulated;
+    accumulated += total ? (count / total) * 100 : 0;
+    return `${COLORS[index % COLORS.length]} ${start}% ${accumulated}%`;
+  });
+
+  return (
+    <ChartCard title={title} subtitle="Distribution of recorded clicks">
+      {entries.length === 0 || total === 0 ? (
+        <div className="flex h-48 items-center justify-center text-center text-sm text-slate-500">
+          No breakdown data available yet.
+        </div>
+      ) : (
+        <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-center">
+          <div
+            className="relative h-36 w-36 shrink-0 rounded-full"
+            style={{
+              background: `conic-gradient(${gradient.join(", ")})`,
+            }}
+            role="img"
+            aria-label={`${title} distribution`}
+          >
+            <div className="absolute inset-7 flex flex-col items-center justify-center rounded-full bg-white">
+              <span className="text-2xl font-bold text-slate-900">
+                {total.toLocaleString()}
+              </span>
+              <span className="text-[10px] text-slate-500">Total clicks</span>
+            </div>
+          </div>
+
+          <div className="w-full min-w-0 space-y-3">
+            {entries.map(([name, count], index) => (
+              <div
+                key={name}
+                className="flex items-center justify-between gap-3 text-sm"
+              >
+                <div className="flex min-w-0 items-center gap-2">
+                  <span
+                    className="h-2.5 w-2.5 shrink-0 rounded-full"
+                    style={{
+                      backgroundColor: COLORS[index % COLORS.length],
+                    }}
+                  />
+                  <span className="truncate text-slate-600">{name}</span>
+                </div>
+                <div className="shrink-0 text-right">
+                  <span className="font-semibold text-slate-900">
+                    {count.toLocaleString()}
+                  </span>
+                  <span className="ml-2 text-xs text-slate-400">
+                    {Math.round((count / total) * 100)}%
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </ChartCard>
+  );
+}
 
 export default function Analytics() {
   const [links, setLinks] = useState([]);
@@ -62,43 +306,45 @@ export default function Analytics() {
     };
   }, [selectedCode, days]);
 
-  const dailyClicks = Object.entries(stats?.daily_clicks || {})
-    .sort(([a], [b]) => a.localeCompare(b));
-
-  const maxClicks = Math.max(
-    1,
-    ...dailyClicks.map(([, count]) => Number(count) || 0)
+  const dailyClicks = useMemo(
+    () =>
+      Object.entries(stats?.daily_clicks || {}).sort(([a], [b]) =>
+        a.localeCompare(b)
+      ),
+    [stats]
   );
 
-  const breakdowns = [
-    ["Browsers", stats?.browsers],
-    ["Devices", stats?.devices],
-  ];
+  const totalClicks = Number(stats?.total_clicks) || 0;
+
+  const busiestDay = dailyClicks.reduce(
+    (best, current) =>
+      Number(current[1]) > Number(best[1]) ? current : best,
+    ["", 0]
+  );
 
   return (
     <div className="min-h-screen bg-[#f6f7fb] text-slate-900 md:flex">
       <Sidebar />
 
       <main className="min-w-0 flex-1 px-4 py-6 sm:px-7 sm:py-8 lg:px-10 lg:py-10">
-        <header className="mb-9 flex flex-wrap items-center justify-between gap-4">
+        <header className="mb-8 flex flex-wrap items-center justify-between gap-4">
           <div>
             <p className="text-sm font-medium text-slate-500">
-              Workspace <span className="mx-2 text-slate-300">/</span> Analytics
+              Workspace <span className="mx-2 text-slate-300">/</span>
+              Analytics
             </p>
-
             <h2 className="mt-3 text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">
               Analytics
             </h2>
-
             <p className="mt-2 text-sm leading-6 text-slate-500 sm:text-base">
               Understand how people interact with your short links.
             </p>
           </div>
 
-          <div className="flex items-center gap-2 rounded-full border border-violet-100 bg-white px-4 py-2.5 text-sm font-medium text-violet-700 shadow-sm">
+          <span className="flex items-center gap-2 rounded-full border border-violet-100 bg-white px-4 py-2.5 text-sm font-medium text-violet-700 shadow-sm">
             <span className="h-2 w-2 rounded-full bg-violet-500" />
             Link insights
-          </div>
+          </span>
         </header>
 
         {error && (
@@ -124,78 +370,75 @@ export default function Analytics() {
               No links to analyze yet
             </h3>
             <p className="mt-2 text-sm text-slate-500">
-              Create your first short link to start exploring its performance.
+              Create your first short link to explore its performance.
             </p>
             <NavLink
               to="/"
-              className="mt-6 inline-flex items-center justify-center rounded-xl bg-violet-600 px-5 py-3 text-sm font-semibold text-white shadow-md shadow-violet-600/20 transition hover:bg-violet-700"
+              className="mt-6 inline-flex items-center justify-center rounded-xl bg-violet-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-violet-700"
             >
               Go to dashboard →
             </NavLink>
           </div>
         ) : (
           <>
-            <section className="mb-7 rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm sm:p-7">
-              <div className="mb-5">
-                <h3 className="text-lg font-bold text-slate-950">
-                  Report settings
-                </h3>
-                <p className="mt-1 text-sm text-slate-500">
-                  Choose a link and reporting period.
-                </p>
-              </div>
+            <section className="mb-7 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm sm:p-6">
+              <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+                <div>
+                  <label
+                    className="mb-2 block text-sm font-semibold text-slate-700"
+                    htmlFor="analytics-link"
+                  >
+                    Select a short link
+                  </label>
+                  <select
+                    id="analytics-link"
+                    value={selectedCode}
+                    onChange={(event) =>
+                      setSelectedCode(event.target.value)
+                    }
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-violet-500 focus:ring-4 focus:ring-violet-100"
+                  >
+                    {links.map((link) => {
+                      let domain = link.original_url;
+                      try {
+                        domain = new URL(link.original_url).hostname;
+                      } catch {
+                        // Keep the original URL if parsing fails.
+                      }
 
-              <label
-                className="mb-2 block text-sm font-semibold text-slate-700"
-                htmlFor="analytics-link"
-              >
-                Select a short link
-              </label>
+                      return (
+                        <option
+                          key={link.short_code}
+                          value={link.short_code}
+                        >
+                          {link.short_code} — {domain}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
 
-              <select
-                id="analytics-link"
-                value={selectedCode}
-                onChange={(event) => setSelectedCode(event.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3.5 text-sm text-slate-800 outline-none transition focus:border-violet-500 focus:bg-white focus:ring-4 focus:ring-violet-100 sm:max-w-xl"
-              >
-                {links.map((link) => {
-                  let domain = link.original_url;
-
-                  try {
-                    domain = new URL(link.original_url).hostname;
-                  } catch {
-                    // Retain the original URL if it cannot be parsed.
-                  }
-
-                  return (
-                    <option key={link.short_code} value={link.short_code}>
-                      {link.short_code} — {domain}
-                    </option>
-                  );
-                })}
-              </select>
-
-              <div className="mt-6">
-                <p className="mb-3 text-sm font-semibold text-slate-700">
-                  Reporting period
-                </p>
-
-                <div className="flex flex-wrap gap-2">
-                  {[7, 30, 90].map((range) => (
-                    <button
-                      type="button"
-                      key={range}
-                      onClick={() => setDays(range)}
-                      aria-pressed={days === range}
-                      className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
-                        days === range
-                          ? "bg-violet-600 text-white shadow-md shadow-violet-600/20"
-                          : "border border-slate-200 bg-white text-slate-600 hover:border-violet-200 hover:bg-violet-50 hover:text-violet-700"
-                      }`}
-                    >
-                      Last {range} days
-                    </button>
-                  ))}
+                <div>
+                  <p className="mb-2 text-sm font-semibold text-slate-700">
+                    Reporting period
+                  </p>
+                  <div className="flex gap-2">
+                    {[7, 30, 90].map((range) => (
+                      <button
+                        type="button"
+                        key={range}
+                        onClick={() => setDays(range)}
+                        aria-pressed={days === range}
+                        className={`rounded-xl px-4 py-3 text-sm font-semibold transition ${
+                          days === range
+                            ? "bg-violet-600 text-white shadow-md shadow-violet-600/20"
+                            : "border border-slate-200 bg-white text-slate-600 hover:bg-violet-50"
+                        }`}
+                      >
+                        {range}d
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
             </section>
@@ -207,167 +450,88 @@ export default function Analytics() {
               </div>
             ) : stats ? (
               <>
-                <section className="grid gap-5 sm:grid-cols-2">
-                  <div className="group rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm transition duration-200 hover:-translate-y-1 hover:border-violet-200 hover:shadow-lg hover:shadow-violet-950/5 sm:p-7">
-                    <div className="flex items-center justify-between gap-3">
+                <section className="mb-6 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+                  <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm">
+                    <div className="flex items-center justify-between">
                       <p className="text-sm font-semibold text-slate-500">
                         Total clicks
                       </p>
-                      <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-50 text-xl text-violet-600 transition group-hover:bg-violet-600 group-hover:text-white">
+                      <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-50 text-xl text-violet-600">
                         ↗
                       </span>
                     </div>
-
-                    <p className="mt-5 text-4xl font-bold tracking-tight text-slate-950">
-                      {(Number(stats.total_clicks) || 0).toLocaleString()}
+                    <p className="mt-4 text-4xl font-bold tracking-tight">
+                      {totalClicks.toLocaleString()}
                     </p>
-
-                    <p className="mt-3 text-sm text-slate-500">
+                    <p className="mt-2 text-sm text-slate-500">
                       Recorded for this short link
                     </p>
                   </div>
 
-                  <div className="group rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm transition duration-200 hover:-translate-y-1 hover:border-indigo-200 hover:shadow-lg hover:shadow-indigo-950/5 sm:p-7">
-                    <div className="flex items-center justify-between gap-3">
+                  <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm">
+                    <div className="flex items-center justify-between">
                       <p className="text-sm font-semibold text-slate-500">
                         Reporting period
                       </p>
-                      <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-50 text-xl text-indigo-600 transition group-hover:bg-indigo-600 group-hover:text-white">
+                      <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-50 text-xl text-indigo-600">
                         ◷
                       </span>
                     </div>
-
-                    <p className="mt-5 text-4xl font-bold tracking-tight text-slate-950">
+                    <p className="mt-4 text-4xl font-bold tracking-tight">
                       {days} days
                     </p>
-
-                    <p className="mt-3 text-sm text-slate-500">
+                    <p className="mt-2 text-sm text-slate-500">
                       Selected analytics window
                     </p>
                   </div>
-                </section>
 
-                <section className="mt-7 rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm sm:p-8">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <h3 className="text-lg font-bold text-slate-950 sm:text-xl">
-                        Click activity
-                      </h3>
-                      <p className="mt-1 text-sm text-slate-500">
-                        Daily clicks during the selected period.
+                  <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm sm:col-span-2 xl:col-span-1">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-semibold text-slate-500">
+                        Busiest recorded day
                       </p>
+                      <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-50 text-xl text-emerald-600">
+                        ↑
+                      </span>
                     </div>
-
-                    <span className="rounded-full bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-700">
-                      Last {days} days
-                    </span>
+                    <p className="mt-4 text-3xl font-bold tracking-tight">
+                      {busiestDay[0] ? formatDate(busiestDay[0]) : "—"}
+                    </p>
+                    <p className="mt-2 text-sm text-slate-500">
+                      {Number(busiestDay[1]) || 0} clicks on the busiest day
+                    </p>
                   </div>
-
-                  {dailyClicks.length === 0 ? (
-                    <div className="mt-7 rounded-xl bg-slate-50 px-5 py-10 text-center">
-                      <p className="font-medium text-slate-700">
-                        No click activity yet
-                      </p>
-                      <p className="mt-2 text-sm text-slate-500">
-                        Click data will appear here when your link receives visits.
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="mt-8 overflow-x-auto pb-2">
-                      <div className="flex h-56 min-w-full items-end gap-3 border-b border-slate-200">
-                        {dailyClicks.map(([date, count]) => {
-                          const value = Number(count) || 0;
-
-                          return (
-                            <div
-                              key={date}
-                              className="flex h-full min-w-10 flex-1 flex-col items-center justify-end gap-2"
-                            >
-                              <span className="text-xs font-semibold text-slate-600">
-                                {value}
-                              </span>
-
-                              <div
-                                title={`${date}: ${value} clicks`}
-                                className="w-full max-w-12 rounded-t-lg bg-gradient-to-t from-violet-600 to-violet-400 transition-all duration-300 hover:from-violet-700 hover:to-indigo-400"
-                                style={{
-                                  height: `${Math.max(5, (value / maxClicks) * 100)}%`,
-                                }}
-                              />
-
-                              <span className="pb-1 text-[10px] text-slate-500">
-                                {date.slice(5)}
-                              </span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
                 </section>
 
-                <section className="mt-7 grid gap-5 lg:grid-cols-2">
-                  {breakdowns.map(([title, breakdown]) => {
-                    const entries = Object.entries(breakdown || {}).sort(
-                      ([, a], [, b]) => Number(b) - Number(a)
-                    );
+                <ChartCard
+                  title="Click activity"
+                  subtitle={`Daily clicks during the last ${days} days`}
+                >
+                  <DailyLineChart data={dailyClicks} />
+                </ChartCard>
 
-                    const maxCount = Math.max(
-                      1,
-                      ...entries.map(([, count]) => Number(count) || 0)
-                    );
-
-                    return (
-                      <div
-                        key={title}
-                        className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm sm:p-7"
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          <h3 className="text-lg font-bold text-slate-950">
-                            {title}
-                          </h3>
-                          <span className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600">
-                            {entries.length} types
-                          </span>
-                        </div>
-
-                        {!entries.length ? (
-                          <p className="mt-5 rounded-xl bg-slate-50 p-5 text-sm text-slate-500">
-                            No breakdown data available yet.
-                          </p>
-                        ) : (
-                          <div className="mt-6 space-y-5">
-                            {entries.map(([name, count]) => {
-                              const value = Number(count) || 0;
-
-                              return (
-                                <div key={name}>
-                                  <div className="mb-2 flex justify-between gap-3 text-sm">
-                                    <span className="font-medium text-slate-700">
-                                      {name}
-                                    </span>
-                                    <span className="font-semibold tabular-nums text-slate-900">
-                                      {value.toLocaleString()}
-                                    </span>
-                                  </div>
-
-                                  <div className="h-2.5 overflow-hidden rounded-full bg-slate-100">
-                                    <div
-                                      className="h-full rounded-full bg-gradient-to-r from-violet-600 to-indigo-400 transition-all duration-500"
-                                      style={{
-                                        width: `${Math.min(100, (value / maxCount) * 100)}%`,
-                                      }}
-                                    />
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
+                <section className="mt-6 grid gap-5 lg:grid-cols-2">
+                  <BreakdownChart
+                    title="Clicks by browser"
+                    data={stats.browsers}
+                  />
+                  <BreakdownChart
+                    title="Clicks by device"
+                    data={stats.devices}
+                  />
                 </section>
+
+                <div className="mt-6 rounded-2xl border border-violet-100 bg-violet-50/70 p-5">
+                  <p className="text-sm font-semibold text-violet-900">
+                    About your analytics
+                  </p>
+                  <p className="mt-1 text-sm leading-6 text-violet-800">
+                    Charts reflect the click data returned by your API.
+                    Unique visitors, traffic sources, and operating-system
+                    analytics are not displayed because the current API
+                    response does not provide those metrics.
+                  </p>
+                </div>
               </>
             ) : (
               <div className="rounded-2xl border border-slate-200 bg-white p-8 text-sm text-slate-500 shadow-sm">

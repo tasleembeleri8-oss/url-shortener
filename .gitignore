@@ -27,4 +27,4 @@ Thumbs.db
 .coverage
 test.db
 *.db
-.pytest_cache/
+.pytest_cache/results_*.csv
