@@ -260,6 +260,4 @@ pytest
 
 - GitHub: [@tasleembeleri8-oss](https://github.com/tasleembeleri8-oss)
 
-## License
 
-Add a license file if you intend to distribute this project under an open-source license.
