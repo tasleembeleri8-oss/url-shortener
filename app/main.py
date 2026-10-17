@@ -18,6 +18,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 from urllib.parse import urlparse
 
+
 from . import models, schemas
 from .ratelimit import limit_by_ip, limit_by_user
 from .analytics import record_click, start_flusher, stop_flusher
@@ -51,6 +52,16 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="URL Shortener", lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "https://tasleem-url-shortener-frontend.onrender.com",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app.add_middleware(
     CORSMiddleware,
