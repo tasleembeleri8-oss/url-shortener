@@ -24,10 +24,14 @@ class LinkInfo(BaseModel):
     created_at: datetime
     model_config = {"from_attributes": True}
 
+
 class LinkStats(BaseModel):
     short_code: str
     original_url: str
     total_clicks: int
+    unique_visitors: int
     daily_clicks: dict[str, int]
     browsers: dict[str, int]
     devices: dict[str, int]
+    operating_systems: dict[str, int]
+    referrers: dict[str, int]

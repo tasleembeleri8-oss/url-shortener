@@ -16,6 +16,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import func
 from sqlalchemy.orm import Session
+from urllib.parse import urlparse
 
 from . import models, schemas
 from .ratelimit import limit_by_ip, limit_by_user
@@ -210,6 +211,11 @@ def my_links(
     "/stats/{short_code}",
     response_model=schemas.LinkStats,
 )
+
+@app.get(
+    "/stats/{short_code}",
+    response_model=schemas.LinkStats,
+)
 def link_stats(
     short_code: str,
     days: int = Query(default=7, ge=1, le=90),
@@ -232,10 +238,12 @@ def link_stats(
         )
 
     since = datetime.utcnow() - timedelta(days=days)
+
+    # Daily clicks within the selected date range.
     day = func.date(models.Click.clicked_at)
 
     daily = (
-        db.query(day, func.count())
+        db.query(day, func.count(models.Click.id))
         .filter(
             models.Click.link_id == link.id,
             models.Click.clicked_at >= since,
@@ -245,36 +253,91 @@ def link_stats(
         .all()
     )
 
+    # Browser statistics.
     browsers = (
         db.query(
             models.Click.browser,
-            func.count(),
+            func.count(models.Click.id),
         )
         .filter(models.Click.link_id == link.id)
         .group_by(models.Click.browser)
         .all()
     )
 
+    # Device statistics.
     devices = (
         db.query(
             models.Click.device,
-            func.count(),
+            func.count(models.Click.id),
         )
         .filter(models.Click.link_id == link.id)
         .group_by(models.Click.device)
         .all()
     )
 
+    # Operating-system statistics.
+    operating_systems = (
+        db.query(
+            models.Click.operating_system,
+            func.count(models.Click.id),
+        )
+        .filter(models.Click.link_id == link.id)
+        .group_by(models.Click.operating_system)
+        .all()
+    )
+
+    # Total clicks across the link's lifetime.
     total = (
         db.query(func.count(models.Click.id))
         .filter(models.Click.link_id == link.id)
         .scalar()
     )
 
+    # Unique visitors within the selected date range.
+    unique_visitors = (
+        db.query(
+            func.count(
+                func.distinct(models.Click.visitor_id)
+            )
+        )
+        .filter(
+            models.Click.link_id == link.id,
+            models.Click.clicked_at >= since,
+            models.Click.visitor_id.isnot(None),
+        )
+        .scalar()
+    )
+
+    # Traffic sources, grouped by referring domain.
+    click_referrers = (
+        db.query(models.Click.referrer)
+        .filter(models.Click.link_id == link.id)
+        .all()
+    )
+
+    referrers = {}
+
+    for (referrer,) in click_referrers:
+        if not referrer:
+            source = "Direct / Unknown"
+        else:
+            parsed = urlparse(
+                referrer if "://" in referrer
+                else f"//{referrer}",
+                scheme="https",
+            )
+            source = parsed.netloc.lower() or "Direct / Unknown"
+
+            if source.startswith("www."):
+                source = source[4:]
+
+        referrers[source] = referrers.get(source, 0) + 1
+
     return schemas.LinkStats(
         short_code=link.short_code,
         original_url=link.original_url,
         total_clicks=total or 0,
+        unique_visitors=unique_visitors or 0,
         daily_clicks={
             str(date): count
             for date, count in daily
@@ -284,10 +347,16 @@ def link_stats(
             for browser, count in browsers
         },
         devices={
-            device or "desktop": count
+            device or "Other": count
             for device, count in devices
         },
+        operating_systems={
+            operating_system or "Other": count
+            for operating_system, count in operating_systems
+        },
+        referrers=referrers,
     )
+
 
 
 @app.delete(

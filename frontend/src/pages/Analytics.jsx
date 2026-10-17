@@ -471,17 +471,17 @@ export default function Analytics() {
                   <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm">
                     <div className="flex items-center justify-between">
                       <p className="text-sm font-semibold text-slate-500">
-                        Reporting period
+                        Unique visitors
                       </p>
                       <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-50 text-xl text-indigo-600">
-                        ◷
+                        ◎
                       </span>
                     </div>
                     <p className="mt-4 text-4xl font-bold tracking-tight">
-                      {days} days
+                      {(Number(stats.unique_visitors) || 0).toLocaleString()}
                     </p>
                     <p className="mt-2 text-sm text-slate-500">
-                      Selected analytics window
+                      Distinct visitor IDs in the last {days} days
                     </p>
                   </div>
 
@@ -519,6 +519,14 @@ export default function Analytics() {
                     title="Clicks by device"
                     data={stats.devices}
                   />
+                  <BreakdownChart
+                    title="Clicks by operating system"
+                    data={stats.operating_systems}
+                  />
+                  <BreakdownChart
+                    title="Traffic sources"
+                    data={stats.referrers}
+                  />
                 </section>
 
                 <div className="mt-6 rounded-2xl border border-violet-100 bg-violet-50/70 p-5">
@@ -526,10 +534,12 @@ export default function Analytics() {
                     About your analytics
                   </p>
                   <p className="mt-1 text-sm leading-6 text-violet-800">
-                    Charts reflect the click data returned by your API.
-                    Unique visitors, traffic sources, and operating-system
-                    analytics are not displayed because the current API
-                    response does not provide those metrics.
+                    Unique visitors are estimated using anonymous browser
+                    cookies, so the same person using different browsers or
+                    devices may count more than once. Traffic sources depend
+                    on referrer information supplied by the visitor's browser;
+                    direct visits and some apps may not provide it. Older
+                    clicks may not include visitor IDs or operating-system data.
                   </p>
                 </div>
               </>

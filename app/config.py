@@ -5,7 +5,7 @@ class Settings(BaseSettings):
 
     database_url: str = "postgresql://shortener:shortener@localhost:5432/shortener"
     redis_url: str = "redis://localhost:6379/0"
-    base_url: str = "http://localhost:8000"
+    base_url: str = "https://url-shortener-n5z1.onrender.com"
     secret_key: str
     algorithm: str = "HS256"
     access_token_minutes: int = 60
